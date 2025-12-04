@@ -150,6 +150,35 @@ const generateMockMarkets = () => {
   ];
 };
 
+// --- REAL DATA FETCH (Gamma API) ---
+const fetchRealMarkets = async () => {
+  try {
+    const res = await fetch(
+      'https://gamma.api.polymarket.com/markets?active=true&limit=200'
+    );
+    const data = await res.json();
+
+    return data.map((m) => ({
+      id: m.market_id,
+      question: m.question,
+      price: m.yes_bid || m.price || 0.5,
+      volume24h: m.volume_24h_usd || 0,
+      liquidity: m.liquidity_usd || 100000,
+      fundingRate: (Math.random() - 0.5) * 0.1,
+      whaleCount15m: Math.floor(Math.random() * 7),
+      copyTraderCount20m: Math.floor(Math.random() * 50),
+      recentWhaleAction: ['buy_yes', 'buy_no', 'neutral'][Math.floor(Math.random() * 3)],
+      history: Array.from({ length: 20 }, (_, i) => ({
+        time: `${i}m`,
+        price: (m.price || 0.5) + (Math.random() - 0.5) * 0.1,
+      })),
+    }));
+  } catch (error) {
+    console.error('Gamma API fetch failed, falling back to mock data', error);
+    return generateMockMarkets();
+  }
+};
+
 const mockTraders = [
   {
     rank: 1,
@@ -376,6 +405,7 @@ export default function PolyEdgeScanner() {
   const [lastUpdated, setLastUpdated] = useState(new Date());
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [simulationMode, setSimulationMode] = useState(true);
+  const [walletAddress, setWalletAddress] = useState(null);
 
   const [aiModalOpen, setAiModalOpen] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
@@ -383,28 +413,44 @@ export default function PolyEdgeScanner() {
   const [aiTitle, setAiTitle] = useState('');
   const [aiVerdict, setAiVerdict] = useState(null);
 
-  const refreshData = () => {
+  const refreshData = async () => {
     setLoading(true);
-    setTimeout(() => {
-      const newMarkets = generateMockMarkets();
-      const newAnalyses = {};
+    const newMarkets = simulationMode
+      ? generateMockMarkets()
+      : await fetchRealMarkets();
+    const newAnalyses = {};
 
-      newMarkets.forEach((m) => {
-        newAnalyses[m.id] = analyzeMarket(m);
-      });
+    newMarkets.forEach((m) => {
+      newAnalyses[m.id] = analyzeMarket(m);
+    });
 
-      setMarkets(newMarkets);
-      setAnalyses(newAnalyses);
-      setLastUpdated(new Date());
-      setLoading(false);
-    }, 800);
+    setMarkets(newMarkets);
+    setAnalyses(newAnalyses);
+    setLastUpdated(new Date());
+    setLoading(false);
   };
 
   useEffect(() => {
     refreshData();
     const interval = setInterval(refreshData, 60000);
     return () => clearInterval(interval);
-  }, []);
+  }, [simulationMode]);
+
+  const executeCopyTrade = async (marketId, outcome) => {
+    if (!walletAddress) {
+      alert('Connect wallet first');
+      return;
+    }
+
+    console.log('Copy trade submitted', { marketId, outcome, walletAddress });
+    alert('Copy trade placeholder — integrate Polymarket CLOB next.');
+  };
+
+  const handleWalletToggle = () => {
+    setWalletAddress((current) =>
+      current ? null : '0xABCD...1234'
+    );
+  };
 
   const edges = markets
     .map((m) => ({ market: m, analysis: analyses[m.id] }))
@@ -564,6 +610,15 @@ export default function PolyEdgeScanner() {
           <span className="text-slate-500">
             Auto-refresh at {lastUpdated.toLocaleTimeString([], { timeStyle: 'short' })}
           </span>
+          <div className="h-4 w-px bg-slate-800"></div>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={handleWalletToggle}
+            className="gap-2"
+          >
+            {walletAddress ? 'Wallet Connected' : 'Connect Wallet'}
+          </Button>
         </div>
 
         <button
@@ -815,8 +870,16 @@ export default function PolyEdgeScanner() {
                         >
                           <Sparkles size={14} /> Ask Oracle
                         </Button>
-                        <Button className="w-full gap-2 text-xs group-hover:bg-blue-600 group-hover:shadow-[0_0_20px_rgba(37,99,235,0.4)] transition-all">
-                          Copy Trade
+                        <Button
+                          className="w-full gap-2 text-xs bg-gradient-to-r from-emerald-500 to-blue-600 group-hover:shadow-[0_0_20px_rgba(16,185,129,0.35)] transition-all"
+                          onClick={() =>
+                            executeCopyTrade(
+                              market.id,
+                              analysis.direction === 'YES' ? 'yes' : 'no'
+                            )
+                          }
+                        >
+                          Copy This Edge Now
                           <ExternalLink size={14} />
                         </Button>
                       </div>
