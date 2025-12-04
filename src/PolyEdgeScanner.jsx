@@ -34,6 +34,7 @@ import {
   Area,
 } from 'recharts';
 import { askPolyEdgeOracle } from './lib/ai/oracle';
+import { useBankrTrade } from './hooks/useBankrTrade';
 
 /**
  * POLYEDGE SCANNER
@@ -413,6 +414,12 @@ export default function PolyEdgeScanner() {
   const [aiTitle, setAiTitle] = useState('');
   const [aiVerdict, setAiVerdict] = useState(null);
 
+  const {
+    copyEdgeViaBankr,
+    isBankrReady,
+    isExecuting: isBankrExecuting,
+  } = useBankrTrade({ apiKey: process.env.BANKR_API_KEY });
+
   const refreshData = async () => {
     setLoading(true);
     const newMarkets = simulationMode
@@ -436,14 +443,30 @@ export default function PolyEdgeScanner() {
     return () => clearInterval(interval);
   }, [simulationMode]);
 
-  const executeCopyTrade = async (marketId, outcome) => {
+  const executeCopyTrade = async (market, analysis) => {
     if (!walletAddress) {
       alert('Connect wallet first');
       return;
     }
 
-    console.log('Copy trade submitted', { marketId, outcome, walletAddress });
-    alert('Copy trade placeholder — integrate Polymarket CLOB next.');
+    if (isBankrReady) {
+      try {
+        const tx = await copyEdgeViaBankr(market, analysis, 500);
+        const txSuffix = tx?.hash ? ` Tx: ${tx.hash}` : '';
+        alert(`Bankr Bot is executing your copy trade.${txSuffix}`);
+      } catch (error) {
+        console.error('Bankr execution failed:', error);
+        alert('Bankr Bot execution failed — check BANKR_API_KEY or retry.');
+      }
+      return;
+    }
+
+    console.log('Copy trade submitted (placeholder)', {
+      marketId: market.id,
+      outcome: analysis.direction === 'YES' ? 'yes' : 'no',
+      walletAddress,
+    });
+    alert('Bankr Bot not configured — integrate CLOB/Bankr to auto-execute.');
   };
 
   const handleWalletToggle = () => {
@@ -735,6 +758,10 @@ export default function PolyEdgeScanner() {
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
+                  <Badge variant={isBankrReady ? 'success' : 'outline'} className="hidden md:inline-flex gap-2">
+                    <Bot size={14} />
+                    Bankr Bot {isBankrReady ? 'Ready' : 'Not Configured'}
+                  </Badge>
                   <Button variant="secondary" size="sm" onClick={refreshData}>
                     <TrendingUp size={16} className="mr-2" />
                     Force Refresh
@@ -871,15 +898,11 @@ export default function PolyEdgeScanner() {
                           <Sparkles size={14} /> Ask Oracle
                         </Button>
                         <Button
-                          className="w-full gap-2 text-xs bg-gradient-to-r from-emerald-500 to-blue-600 group-hover:shadow-[0_0_20px_rgba(16,185,129,0.35)] transition-all"
-                          onClick={() =>
-                            executeCopyTrade(
-                              market.id,
-                              analysis.direction === 'YES' ? 'yes' : 'no'
-                            )
-                          }
+                          className="w-full gap-2 text-xs bg-gradient-to-r from-purple-600 to-blue-600 group-hover:shadow-[0_0_20px_rgba(99,102,241,0.35)] transition-all"
+                          onClick={() => executeCopyTrade(market, analysis)}
+                          disabled={isBankrExecuting}
                         >
-                          Copy This Edge Now
+                          {isBankrExecuting ? 'Executing via Bankr…' : 'Copy via Bankr Bot'}
                           <ExternalLink size={14} />
                         </Button>
                       </div>

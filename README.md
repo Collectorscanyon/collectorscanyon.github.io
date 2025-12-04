@@ -7,6 +7,7 @@ PolyEdge Scanner is a React-based Polymarket intelligence dashboard that pairs a
 - **Edge scoring**: Applies rule-based analysis on each market (funding, whale clusters, liquidity squeezes, copy-trader surges) to derive a 1–10 score and recommended direction (YES/NO/SHADOW_WHALE) that drives the badge and tags shown in the cards.
 - **AI oracle modal**: Asks the ensemble PolyEdge Oracle for a structured verdict (direction, conviction, confidence, targets, reasoning) and displays it in a modal alongside the dashboard results.
 - **Whale leaderboard**: Lists mocked whale traders with PnL and win-rate progress bars, letting users open an AI-generated whale profile from the same Gemini client used for secondary prompts.
+- **Bankr copy execution**: Copy buttons now route through a Bankr Bot hook when `BANKR_API_KEY` is provided, enabling one-click social/agentic execution (with a clear fallback when not configured).
 - **Tabs and settings**: Includes watchlist and configuration panels (simulation toggle, liquidity thresholds) to frame future real-data integration.
 
 ## How it works (high level)
@@ -20,6 +21,11 @@ PolyEdge Scanner is a React-based Polymarket intelligence dashboard that pairs a
 npm install
 npm run start
 ```
+
+### Environment variables
+- `GEMINI_API_KEY` – enables Gemini prompts (whale profiles + fallback oracle text)
+- `ANTHROPIC_API_KEY` – enables Claude in the ensemble oracle
+- `BANKR_API_KEY` – enables Bankr Bot execution for copy trades
 
 ## What’s next
 - Replace `generateMockMarkets()` with live Polymarket data (Gamma API + The Graph) and wire real whale counts via Dune to remove placeholders.
