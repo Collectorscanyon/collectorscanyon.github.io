@@ -4,23 +4,14 @@ import PolyEdgeScanner from './PolyEdgeScanner';
 const privyAppId = process.env.REACT_APP_PRIVY_APP_ID;
 
 const MissingPrivyConfig = () => (
-  <div style={{
-    minHeight: '100vh',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'column',
-    background: '#0f172a',
-    color: '#e2e8f0',
-    padding: '24px',
-    textAlign: 'center',
-  }}>
-    <h1 style={{ fontSize: '1.8rem', marginBottom: '0.5rem' }}>Privy app ID missing</h1>
-    <p style={{ maxWidth: '640px', lineHeight: 1.5 }}>
-      Set <code>REACT_APP_PRIVY_APP_ID</code> in your environment variables (Vercel → Settings → Environment Variables)
-      to enable X login, embedded wallets, and Bankr copy trading. The rest of the dashboard stays client-side and will
-      render once the app ID is available.
-    </p>
+  <div className="min-h-screen bg-[#0a0b14] text-white flex items-center justify-center">
+    <div className="text-center p-8 bg-slate-900 rounded-2xl border border-purple-500/30">
+      <h1 className="text-3xl font-bold mb-4">PolyEdge Scanner</h1>
+      <p className="text-red-400 mb-4">Missing Privy App ID</p>
+      <p className="text-sm text-gray-400">
+        Add REACT_APP_PRIVY_APP_ID to your environment variables
+      </p>
+    </div>
   </div>
 );
 

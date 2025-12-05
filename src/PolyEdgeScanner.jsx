@@ -914,7 +914,7 @@ export default function PolyEdgeScanner() {
                         <Button
                           className={`${isBankrReady ? 'bg-gradient-to-r from-purple-600 to-pink-600' : 'bg-gray-700'} w-full gap-2 text-xs group-hover:shadow-[0_0_20px_rgba(99,102,241,0.35)] transition-all`}
                           onClick={() => copyEdgeViaBankr(market, 250)}
-                          disabled={isBankrExecuting || !isBankrReady}
+                          disabled={isBankrExecuting}
                         >
                           {isBankrExecuting
                             ? 'Executing...'
