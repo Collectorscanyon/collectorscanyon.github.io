@@ -1,45 +1,57 @@
-import { useBankr } from '@bankr/sdk';
-import { useCallback, useMemo, useState } from 'react';
+// src/hooks/useBankrTrade.js — FINAL VERSION
+import { usePrivy, useWallets } from '@privy-io/react-auth';
+import { useState } from 'react';
 
-/**
- * Lightweight Bankr Bot execution hook
- * - Wraps Bankr SDK executeTrade for PolyEdge copy-trade intents
- * - Falls back to a descriptive error when API key or SDK plumbing is missing
- */
-export const useBankrTrade = ({ apiKey }) => {
-  const bankr = useBankr(apiKey || '');
-  const [isExecuting, setIsExecuting] = useState(false);
+export const useBankrTrade = () => {
+  const { ready, authenticated, login, user } = usePrivy();
+  const { wallets } = useWallets();
+  const [loading, setLoading] = useState(false);
 
-  const isBankrReady = useMemo(
-    () => Boolean(apiKey && bankr && typeof bankr.executeTrade === 'function'),
-    [apiKey, bankr]
-  );
+  const copyEdgeViaBankr = async (market, size = 250) => {
+    if (!ready || !authenticated) {
+      await login();
+      return;
+    }
 
-  const copyEdgeViaBankr = useCallback(
-    async (market, analysis, size = 500) => {
-      if (!isBankrReady) {
-        throw new Error('Bankr SDK not ready — add BANKR_API_KEY or check SDK wiring.');
-      }
+    const wallet = wallets.find((w) => w.chainId === 'base:8453');
+    if (!wallet) {
+      alert('Connect Base wallet first (Privy will auto-create one)');
+      return;
+    }
 
-      const prompt = `@bankrbot buy $${size} ${
-        analysis.direction === 'YES' ? 'YES' : 'NO'
-      } shares on "${market.question}" via PolyEdge signal. Max slippage 0.5%.`;
+    setLoading(true);
+    try {
+      const intent = `@bankrbot buy $${size} ${market.outcome} shares on "${market.question}" via PolyEdge signal. Max slippage 0.5%.`;
 
-      setIsExecuting(true);
-      try {
-        const tx = await bankr.executeTrade({
-          intent: prompt,
-          wallet: 'embedded',
+      const res = await fetch('https://api.bankr.bot/v1/execute', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${wallet.address}`,
+          'X-Bankr-Wallet': wallet.address,
+          'X-Privy-User': user?.id || '',
+        },
+        body: JSON.stringify({
+          prompt: intent,
+          wallet: wallet.address,
           chain: 'base',
-          integrations: ['polymarket-clob', '0x-swap'],
-        });
-        return tx;
-      } finally {
-        setIsExecuting(false);
-      }
-    },
-    [bankr, isBankrReady]
-  );
+          integrations: ['polymarket-clob'],
+        }),
+      });
 
-  return { copyEdgeViaBankr, isBankrReady, isExecuting };
+      const data = await res.json();
+      if (data.success || data.hash) {
+        alert(`Copied! Tx: ${data.hash || 'pending'}`);
+      } else {
+        alert(`Bankr error: ${data.error}`);
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Bankr execution failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return { copyEdgeViaBankr, loading, ready: ready && authenticated };
 };
