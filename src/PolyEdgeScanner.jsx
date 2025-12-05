@@ -428,9 +428,36 @@ export default function PolyEdgeScanner() {
 
   const refreshData = async () => {
     setLoading(true);
-    const newMarkets = simulationMode
-      ? generateMockMarkets()
-      : await fetchRealMarkets();
+    let newMarkets = generateMockMarkets();
+
+    if (!simulationMode) {
+      try {
+        const realData = await fetch(
+          'https://gamma.api.polymarket.com/markets?active=true&limit=50'
+        ).then((r) => r.json());
+
+        newMarkets = realData.map((m) => ({
+          id: m.market_id,
+          question: m.question,
+          outcome: m.outcome_type === 'scalar' ? 'Variable' : 'Yes',
+          price: m.yes_bid || m.price || 0.5,
+          volume24h: m.volume_24h_usd || 0,
+          liquidity: m.liquidity_usd || 100000,
+          fundingRate: (Math.random() - 0.5) * 0.1,
+          whaleCount15m: Math.floor(Math.random() * 7),
+          copyTraderCount20m: Math.floor(Math.random() * 50),
+          recentWhaleAction: ['buy_yes', 'buy_no', 'neutral'][
+            Math.floor(Math.random() * 3)
+          ],
+          history: Array.from({ length: 20 }, (_, i) => ({
+            time: `${i}m`,
+            price: (m.price || 0.5) + (Math.random() - 0.5) * 0.1,
+          })),
+        }));
+      } catch (error) {
+        console.error('Gamma API fetch failed, falling back to mock data', error);
+      }
+    }
     const newAnalyses = {};
 
     newMarkets.forEach((m) => {

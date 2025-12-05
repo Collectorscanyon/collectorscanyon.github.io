@@ -77,7 +77,24 @@ Tags: ${analysis.tags?.join?.(", ") ?? ""}
     console.error("Gemini failed JSON", error);
   }
 
-  const votes = [claudeJson, geminiJson].filter(Boolean);
+  const votes = [claudeJson, geminiJson].filter((vote) =>
+    Object.keys(vote || {}).length
+  );
+
+  if (!votes.length) {
+    return {
+      score: Number((analysis?.score ?? 6).toFixed?.(1) ?? 6),
+      direction: analysis?.direction || "NO",
+      conviction: "LOW",
+      reasoning: [
+        "Oracle unavailable — using local model consensus.",
+        ...(analysis?.tags || []),
+      ],
+      targetPrice: analysis?.targetPrice,
+      stopLoss: analysis?.stopLoss,
+      confidenceScore: 0,
+    };
+  }
   const avgScore =
     votes.reduce((acc, v) => acc + (Number(v.score) || 0), 0) /
     (votes.length || 1);
