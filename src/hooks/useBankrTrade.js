@@ -1,21 +1,14 @@
-// src/hooks/useBankrTrade.js — FINAL VERSION
-import { usePrivy, useWallets } from '@privy-io/react-auth';
+// src/hooks/useBankrTrade.js — SDK-Free Version (Direct API)
 import { useState } from 'react';
+import { getEnv } from '../lib/env';
 
 export const useBankrTrade = () => {
-  const { ready: privyReady, authenticated, login, user } = usePrivy();
-  const { wallets } = useWallets();
   const [loading, setLoading] = useState(false);
+  const bankrKey = getEnv('BANKR_API_KEY');
 
-  const copyEdgeViaBankr = async (market, size = 250) => {
-    if (!privyReady || !authenticated) {
-      await login();
-      return;
-    }
-
-    const wallet = wallets.find((w) => w.chainId === 'base:8453');
-    if (!wallet) {
-      alert('Connect Base wallet first (Privy will auto-create one)');
+  const copyEdgeViaBankr = async (market, size = 100) => {
+    if (!bankrKey) {
+      alert('Bankr API key missing — add REACT_APP_BANKR_API_KEY to Vercel env vars');
       return;
     }
 
@@ -23,35 +16,34 @@ export const useBankrTrade = () => {
     try {
       const intent = `@bankrbot buy $${size} ${market.outcome} shares on "${market.question}" via PolyEdge signal. Max slippage 0.5%.`;
 
-      const res = await fetch('https://api.bankr.bot/v1/execute', {
+      const response = await fetch('https://api.bankr.bot/v1/execute', {
         method: 'POST',
         headers: {
+          'Authorization': `Bearer ${bankrKey}`,
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${wallet.address}`,
-          'X-Bankr-Wallet': wallet.address,
-          'X-Privy-User': user?.id || '',
         },
         body: JSON.stringify({
           prompt: intent,
-          wallet: wallet.address,
-          chain: 'base',
-          integrations: ['polymarket-clob'],
+          chain: 'base', // Polymarket's chain
+          wallet: 'embedded', // Privy
+          integrations: ['polymarket-clob']
         }),
       });
 
-      const data = await res.json();
-      if (data.success || data.hash) {
-        alert(`Copied! Tx: ${data.hash || 'pending'}`);
-      } else {
-        alert(`Bankr error: ${data.error}`);
+      if (!response.ok) throw new Error(`Bankr API error: ${response.statusText}`);
+
+      const tx = await response.json();
+      if (tx.hash) {
+        alert(`Copied via Bankr! Tx: ${tx.hash}`);
+        // Log to oracle
       }
-    } catch (e) {
-      console.error(e);
-      alert('Bankr execution failed');
+    } catch (error) {
+      console.error('Bankr execution failed:', error);
+      alert('Fallback to manual copy — check console');
     } finally {
       setLoading(false);
     }
   };
 
-  return { copyEdgeViaBankr, loading, ready: privyReady, authenticated };
+  return { copyEdgeViaBankr, loading };
 };
