@@ -2,19 +2,19 @@
 import { useState } from 'react';
 import { getEnv } from '../lib/env';
 
-export const useBankrTrade = ({ apiKey } = {}) => {
-  const [isExecuting, setIsExecuting] = useState(false);
-  const bankrKey = apiKey || getEnv('BANKR_API_KEY');
-  const isBankrReady = Boolean(bankrKey);
+export const useBankrTrade = () => {
+  const [loading, setLoading] = useState(false);
+  const bankrKey = getEnv('BANKR_API_KEY');
 
-  const copyEdgeViaBankr = async (market, analysis, size = 100) => {
-    if (!isBankrReady) {
-      throw new Error('Bankr API key missing — add REACT_APP_BANKR_API_KEY to Vercel env vars');
+  const copyEdgeViaBankr = async (market, size = 100) => {
+    if (!bankrKey) {
+      alert('Bankr API key missing — add REACT_APP_BANKR_API_KEY to Vercel env vars');
+      return;
     }
 
-    setIsExecuting(true);
+    setLoading(true);
     try {
-      const intent = `@bankrbot buy $${size} ${market.outcome || 'YES'} shares on "${market.question}" via PolyEdge signal (edge score ${analysis?.score ?? 'N/A'}). Max slippage 0.5%.`;
+      const intent = `@bankrbot buy $${size} ${market.outcome} shares on "${market.question}" via PolyEdge signal. Max slippage 0.5%.`;
 
       const response = await fetch('https://api.bankr.bot/v1/execute', {
         method: 'POST',
@@ -34,13 +34,16 @@ export const useBankrTrade = ({ apiKey } = {}) => {
 
       const tx = await response.json();
       if (tx.hash) {
-        console.info('Bankr Bot executed copy trade', { hash: tx.hash });
+        alert(`Copied via Bankr! Tx: ${tx.hash}`);
+        // Log to oracle
       }
-      return tx;
+    } catch (error) {
+      console.error('Bankr execution failed:', error);
+      alert('Fallback to manual copy — check console');
     } finally {
-      setIsExecuting(false);
+      setLoading(false);
     }
   };
 
-  return { copyEdgeViaBankr, isBankrReady, isExecuting };
+  return { copyEdgeViaBankr, loading };
 };
