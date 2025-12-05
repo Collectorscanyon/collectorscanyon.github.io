@@ -1,5 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { usePrivy } from '@privy-io/react-auth';
+import React, { useEffect, useState } from 'react';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import {
   Activity,
@@ -329,7 +328,7 @@ const Button = ({
   disabled,
 }) => {
   const base =
-    'inline-flex items-center justify-center rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-slate-950';
+    'inline-flex items-center justify-center rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2 disabled:opacity-50 disabled:pointer[...]';
   const variants = {
     primary:
       'bg-blue-600 text-white hover:bg-blue-700 shadow-[0_0_20px_rgba(37,99,235,0.3)]',
@@ -419,16 +418,46 @@ export default function PolyEdgeScanner() {
   const [aiTitle, setAiTitle] = useState('');
   const [aiVerdict, setAiVerdict] = useState(null);
 
-  const { ready: privyReady, authenticated, login } = usePrivy();
-
   const {
     copyEdgeViaBankr,
     ready: isBankrReady,
+    authenticated: isBankrAuthenticated,
     loading: isBankrExecuting,
   } = useBankrTrade();
 
-  const refreshData = useCallback(async () => {
+  const refreshData = async () => {
     setLoading(true);
+    let newMarkets = generateMockMarkets();
+
+    if (!simulationMode) {
+      try {
+        const realData = await fetch(
+          'https://gamma.api.polymarket.com/markets?active=true&limit=50'
+        ).then((r) => r.json());
+
+        newMarkets = realData.map((m) => ({
+          id: m.market_id,
+          question: m.question,
+          outcome: m.outcome_type === 'scalar' ? 'Variable' : 'Yes',
+          price: m.yes_bid || m.price || 0.5,
+          volume24h: m.volume_24h_usd || 0,
+          liquidity: m.liquidity_usd || 100000,
+          fundingRate: (Math.random() - 0.5) * 0.1,
+          whaleCount15m: Math.floor(Math.random() * 7),
+          copyTraderCount20m: Math.floor(Math.random() * 50),
+          recentWhaleAction: ['buy_yes', 'buy_no', 'neutral'][
+            Math.floor(Math.random() * 3)
+          ],
+          history: Array.from({ length: 20 }, (_, i) => ({
+            time: `${i}m`,
+            price: (m.price || 0.5) + (Math.random() - 0.5) * 0.1,
+          })),
+        }));
+      } catch (error) {
+        console.error('Gamma API fetch failed, falling back to mock data', error);
+      }
+    }
+    const newAnalyses = {};
 
     try {
       // LIVE REAL DATA WHEN SIMULATION IS OFF
@@ -436,7 +465,7 @@ export default function PolyEdgeScanner() {
         const res = await fetch('https://gamma.api.polymarket.com/markets?active=true&limit=200');
         const liveMarkets = await res.json();
 
-        const realMarkets = liveMarkets.map((m) => ({
+        const realMarkets = liveMarkets.map(m => ({
           id: m.id || m.market_id,
           question: m.question,
           outcome: 'Yes',
@@ -449,12 +478,12 @@ export default function PolyEdgeScanner() {
           recentWhaleAction: ['buy_yes', 'buy_no', 'neutral'][Math.floor(Math.random() * 3)],
           history: Array.from({ length: 20 }, (_, i) => ({
             time: `${i}m`,
-            price: parseFloat(m.yes_price || 0.5) + (Math.random() - 0.5) * 0.05,
-          })),
+            price: parseFloat(m.yes_price || 0.5) + (Math.random() - 0.5) * 0.05
+          }))
         }));
 
         const newAnalyses = {};
-        realMarkets.forEach((m) => {
+        realMarkets.forEach(m => {
           newAnalyses[m.id] = analyzeMarket(m);
         });
 
@@ -464,29 +493,29 @@ export default function PolyEdgeScanner() {
         // fallback to mock only in simulation mode
         const mock = generateMockMarkets();
         const newAnalyses = {};
-        mock.forEach((m) => (newAnalyses[m.id] = analyzeMarket(m)));
+        mock.forEach(m => newAnalyses[m.id] = analyzeMarket(m));
         setMarkets(mock);
         setAnalyses(newAnalyses);
       }
     } catch (err) {
-      console.error('Gamma API failed, falling back to mock', err);
+      console.error("Gamma API failed, falling back to mock", err);
       // fallback to mock if API down
       const mock = generateMockMarkets();
       const newAnalyses = {};
-      mock.forEach((m) => (newAnalyses[m.id] = analyzeMarket(m)));
+      mock.forEach(m => newAnalyses[m.id] = analyzeMarket(m));
       setMarkets(mock);
       setAnalyses(newAnalyses);
     }
 
     setLastUpdated(new Date());
     setLoading(false);
-  }, [simulationMode]);
+  };
 
   useEffect(() => {
     refreshData();
     const interval = setInterval(refreshData, 60000);
     return () => clearInterval(interval);
-  }, [refreshData]);
+  }, [simulationMode]);
 
   const edges = markets
     .map((m) => ({ market: m, analysis: analyses[m.id] }))
@@ -652,7 +681,7 @@ export default function PolyEdgeScanner() {
             size="sm"
             onClick={login}
             className="gap-2"
-            disabled={!privyReady}
+            disabled={!isBankrReady}
           >
             {authenticated ? 'X Login Active' : 'Login with X'}
           </Button>
@@ -767,7 +796,7 @@ export default function PolyEdgeScanner() {
                 <div>
                   <h2 className="text-2xl font-bold text-white">Live Arbitrage Opportunities</h2>
                   <p className="text-slate-400 text-sm mt-1">
-                    Scanner active • Analyzing <span className="text-white font-mono">1,429</span> markets •{' '}
+                    Scanner active  Analyzing <span className="text-white font-mono">1,429</span> markets {' '}
                     <span className="text-emerald-400">3 Whale Clusters</span> detected
                   </p>
                 </div>
@@ -794,7 +823,7 @@ export default function PolyEdgeScanner() {
                   <div className="w-16 h-16 bg-emerald-900/30 rounded-full flex items-center justify-center mb-4">
                     <Shield className="text-emerald-400" size={32} />
                   </div>
-                  <h3 className="text-xl font-bold text-emerald-400">NO EDGE — STAY FLAT</h3>
+                  <h3 className="text-xl font-bold text-emerald-400">NO EDGE  STAY FLAT</h3>
                   <p className="text-emerald-200/60 mt-2 max-w-md">
                     No markets currently meet the 8/10 conviction criteria. Capital preservation mode active. Scanner continues in background.
                   </p>
@@ -838,7 +867,7 @@ export default function PolyEdgeScanner() {
                         <div className="space-y-1">
                           <p className="text-xs text-slate-500 uppercase">Current Price</p>
                           <div className="flex items-baseline gap-2">
-                            <span className="text-2xl font-mono font-bold text-white">{(market.price * 100).toFixed(1)}¢</span>
+                            <span className="text-2xl font-mono font-bold text-white">{(market.price * 100).toFixed(1)}\u00a2</span>
                             <span className="text-xs text-slate-400">({(market.price * 100).toFixed(0)}%)</span>
                           </div>
                         </div>
@@ -912,13 +941,13 @@ export default function PolyEdgeScanner() {
                           <Sparkles size={14} /> Ask Oracle
                         </Button>
                         <Button
-                          className={`${isBankrReady ? 'bg-gradient-to-r from-purple-600 to-pink-600' : 'bg-gray-700'} w-full gap-2 text-xs group-hover:shadow-[0_0_20px_rgba(99,102,241,0.35)] transition-all`}
+                          className={`${isBankrAuthenticated ? 'bg-gradient-to-r from-purple-600 to-pink-600' : 'bg-gray-700'} w-full gap-2 text-xs group-hover:shadow-[0_0_20px_rgba(99,102,241,0.[...]`} 
                           onClick={() => copyEdgeViaBankr(market, 250)}
-                          disabled={isBankrExecuting}
+                          disabled={isBankrExecuting || !isBankrReady}
                         >
                           {isBankrExecuting
                             ? 'Executing...'
-                            : isBankrReady
+                            : isBankrAuthenticated
                               ? 'COPY VIA BANKR'
                               : 'LOGIN WITH X'}
                           <ExternalLink size={14} />
