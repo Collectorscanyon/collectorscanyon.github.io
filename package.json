@@ -14,7 +14,11 @@
     "whatwg-fetch": "^3.6.2"
   },
   "overrides": {
-    "@solana/kit": "3.0.3"
+    "@solana/kit": "3.0.3",
+    "@privy-io/react-auth:@solana/kit": "3.0.3",
+    "@coinbase/cdp-sdk:@solana/kit": "3.0.3",
+    "@base-org/account:@solana/kit": "3.0.3",
+    "@solana-program/system:@solana/kit": "3.0.3"
   },
   "scripts": {
     "start": "react-scripts start",
