@@ -1,45 +1,46 @@
-import { useBankr } from '@bankr/sdk';
-import { useCallback, useMemo, useState } from 'react';
+// src/hooks/useBankrTrade.js — SDK-Free Version (Direct API)
+import { useState } from 'react';
+import { getEnv } from '../lib/env';
 
-/**
- * Lightweight Bankr Bot execution hook
- * - Wraps Bankr SDK executeTrade for PolyEdge copy-trade intents
- * - Falls back to a descriptive error when API key or SDK plumbing is missing
- */
-export const useBankrTrade = ({ apiKey }) => {
-  const bankr = useBankr(apiKey || '');
+export const useBankrTrade = ({ apiKey } = {}) => {
   const [isExecuting, setIsExecuting] = useState(false);
+  const bankrKey = apiKey || getEnv('BANKR_API_KEY');
+  const isBankrReady = Boolean(bankrKey);
 
-  const isBankrReady = useMemo(
-    () => Boolean(apiKey && bankr && typeof bankr.executeTrade === 'function'),
-    [apiKey, bankr]
-  );
+  const copyEdgeViaBankr = async (market, analysis, size = 100) => {
+    if (!isBankrReady) {
+      throw new Error('Bankr API key missing — add REACT_APP_BANKR_API_KEY to Vercel env vars');
+    }
 
-  const copyEdgeViaBankr = useCallback(
-    async (market, analysis, size = 500) => {
-      if (!isBankrReady) {
-        throw new Error('Bankr SDK not ready — add BANKR_API_KEY or check SDK wiring.');
+    setIsExecuting(true);
+    try {
+      const intent = `@bankrbot buy $${size} ${market.outcome || 'YES'} shares on "${market.question}" via PolyEdge signal (edge score ${analysis?.score ?? 'N/A'}). Max slippage 0.5%.`;
+
+      const response = await fetch('https://api.bankr.bot/v1/execute', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${bankrKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          prompt: intent,
+          chain: 'base', // Polymarket's chain
+          wallet: 'embedded', // Privy
+          integrations: ['polymarket-clob']
+        }),
+      });
+
+      if (!response.ok) throw new Error(`Bankr API error: ${response.statusText}`);
+
+      const tx = await response.json();
+      if (tx.hash) {
+        console.info('Bankr Bot executed copy trade', { hash: tx.hash });
       }
-
-      const prompt = `@bankrbot buy $${size} ${
-        analysis.direction === 'YES' ? 'YES' : 'NO'
-      } shares on "${market.question}" via PolyEdge signal. Max slippage 0.5%.`;
-
-      setIsExecuting(true);
-      try {
-        const tx = await bankr.executeTrade({
-          intent: prompt,
-          wallet: 'embedded',
-          chain: 'base',
-          integrations: ['polymarket-clob', '0x-swap'],
-        });
-        return tx;
-      } finally {
-        setIsExecuting(false);
-      }
-    },
-    [bankr, isBankrReady]
-  );
+      return tx;
+    } finally {
+      setIsExecuting(false);
+    }
+  };
 
   return { copyEdgeViaBankr, isBankrReady, isExecuting };
 };
